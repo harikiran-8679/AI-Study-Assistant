@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text Summarizer — AI Study Assistant</title>
+  <meta name="description" content="AI-powered text summarizer that extracts key sentences and highlights important keywords from your study material." />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>" />
+</head>
+<body>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">Analyzing your text…</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <nav class="navbar">
+    <a href="../index.html" class="nav-brand">
+      <div class="brand-icon">🧠</div>
+      <span class="brand-name">AI Study<span>Assist</span></span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="../index.html">🏠 Home</a></li>
+      <li><a href="summary.html" class="active">📝 Summarizer</a></li>
+      <li><a href="quiz.html">❓ Quiz</a></li>
+      <li><a href="flashcards.html">🃏 Flashcards</a></li>
+      <li><a href="planner.html">📅 Planner</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark</span>
+      </button>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <div class="page-badge">📝 AI Summarizer</div>
+      <h1>Text Summarizer</h1>
+      <p>Paste your material and we'll extract the most important sentences and highlight key concepts.</p>
+    </div>
+
+    <!-- Input Card -->
+    <div class="content-card">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">📖</div>
+          Your Study Material
+        </div>
+        <span class="word-count" id="wordCount">0 words</span>
+      </div>
+
+      <textarea class="text-input" id="textInput" placeholder="Paste your paragraphs here…" rows="7"></textarea>
+
+      <div class="input-actions" style="margin-top:1rem">
+        <button class="btn btn-primary" id="summarizeBtn">⚡ Summarize</button>
+        <button class="btn btn-secondary" id="clearInputBtn">🗑️ Clear Input</button>
+        <button class="btn btn-secondary" id="loadSavedBtn">📂 Load Saved</button>
+      </div>
+    </div>
+
+    <!-- Summary Result Card -->
+    <div class="content-card" id="resultCard" style="display:none">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">✨</div>
+          AI Summary
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn btn-success btn-sm" id="copySummaryBtn">📋 Copy</button>
+          <button class="btn btn-secondary btn-sm" id="clearResultBtn">🗑️ Clear</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-bar" id="statsBar"></div>
+
+      <!-- Summary Text -->
+      <div class="result-box" id="summaryOutput"></div>
+
+      <!-- Keywords -->
+      <div style="margin-top:1.25rem">
+        <p style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">
+          🔑 Key Concepts
+        </p>
+        <div id="keywordsContainer" style="display:flex;flex-wrap:wrap;gap:.5rem"></div>
+      </div>
+    </div>
+
+    <!-- Sentence Breakdown -->
+    <div class="content-card" id="sentenceCard" style="display:none">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">🔍</div>
+          Key Sentences Extracted
+        </div>
+        <span class="stat-chip" id="sentenceCount">0 sentences</span>
+      </div>
+      <ul class="quiz-list" id="sentenceList"></ul>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>AI Study Assistant — <a href="../index.html">← Back to Home</a></p>
+  </footer>
+
+  <!-- Inline script for summary page -->
+  <script src="../script.js"></script>
+  <script>
+    /* ── Summary Page Logic ── */
+    (function () {
+      const textInput    = document.getElementById('textInput');
+      const summarizeBtn = document.getElementById('summarizeBtn');
+      const clearInputBtn= document.getElementById('clearInputBtn');
+      const loadSavedBtn = document.getElementById('loadSavedBtn');
+      const resultCard   = document.getElementById('resultCard');
+      const sentenceCard = document.getElementById('sentenceCard');
+      const summaryOutput= document.getElementById('summaryOutput');
+      const keywordsCont = document.getElementById('keywordsContainer');
+      const statsBar     = document.getElementById('statsBar');
+      const sentenceList = document.getElementById('sentenceList');
+      const sentenceCount= document.getElementById('sentenceCount');
+
+      /* Restore saved input */
+      const savedInput = LS.get(LS_KEYS.INPUT);
+      if (savedInput) { textInput.value = savedInput; updateWordCount(savedInput); }
+
+      /* Restore saved summary */
+      const savedSummary = LS.get(LS_KEYS.SUMMARY);
+      if (savedSummary) renderSummary(savedSummary);
+
+      textInput.addEventListener('input', () => {
+        updateWordCount(textInput.value);
+        LS.set(LS_KEYS.INPUT, textInput.value);
+      });
+
+      summarizeBtn.addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (!text) { showToast('⚠️ Please enter some text first!', 'error'); return; }
+        if (text.split(/\s+/).length < 10) { showToast('⚠️ Need at least 10 words to summarize', 'error'); return; }
+
+        showLoading('Analyzing sentences…');
+        setTimeout(() => {
+          try {
+            const result = summarizeText(text);
+            result.originalWordCount = text.trim().split(/\s+/).length;
+            result.summaryWordCount  = result.summary.trim().split(/\s+/).length;
+            LS.set(LS_KEYS.SUMMARY, result);
+            renderSummary(result);
+            showToast('✅ Summary generated!', 'success');
+          } catch (e) {
+            showToast('❌ Error processing text', 'error');
+          } finally {
+            hideLoading();
+          }
+        }, 600);
+      });
+
+      clearInputBtn.addEventListener('click', () => {
+        textInput.value = '';
+        updateWordCount('');
+      });
+
+      loadSavedBtn.addEventListener('click', () => {
+        const saved = LS.get(LS_KEYS.INPUT);
+        if (saved) {
+          textInput.value = saved;
+          updateWordCount(saved);
+          showToast('📂 Loaded saved text!', 'info');
+        } else {
+          showToast('⚠️ No saved text found. Go to Home and paste text first.', 'error', 4500);
+        }
+      });
+
+      document.getElementById('copySummaryBtn')?.addEventListener('click', () => {
+        const text = summaryOutput.innerText;
+        if (text) copyToClipboard(text);
+      });
+
+      document.getElementById('clearResultBtn')?.addEventListener('click', () => {
+        LS.remove(LS_KEYS.SUMMARY);
+        resultCard.style.display   = 'none';
+        sentenceCard.style.display = 'none';
+        showToast('🗑️ Summary cleared', 'info');
+      });
+
+      function renderSummary(result) {
+        if (!result || !result.summary) return;
+        const { summary, keywords = [], sentences = [], originalWordCount, summaryWordCount } = result;
+
+        /* Stats */
+        const compression = originalWordCount
+          ? Math.round((1 - summaryWordCount / originalWordCount) * 100) : 0;
+        statsBar.innerHTML = `
+          <span class="stat-chip">📄 Original: ${(originalWordCount || 0).toLocaleString()} words</span>
+          <span class="stat-chip">✨ Summary: ${(summaryWordCount || 0).toLocaleString()} words</span>
+          <span class="stat-chip">📉 ${compression}% shorter</span>
+          <span class="stat-chip">🔑 ${keywords.length} keywords</span>
+        `;
+
+        /* Summary with highlighted keywords */
+        summaryOutput.innerHTML = highlightKeywords(escapeHtml(summary), keywords);
+
+        /* Keywords pills */
+        keywordsCont.innerHTML = keywords.map(k =>
+          `<span class="keyword" style="cursor:default">${k}</span>`
+        ).join('');
+
+        /* Key sentences */
+        sentenceList.innerHTML = sentences.map((s, i) => `
+          <li class="quiz-item">
+            <div class="quiz-num">${i + 1}</div>
+            <div class="quiz-question">${highlightKeywords(escapeHtml(s), keywords)}</div>
+          </li>
+        `).join('');
+        sentenceCount.textContent = `${sentences.length} sentence${sentences.length !== 1 ? 's' : ''}`;
+
+        resultCard.style.display   = 'block';
+        sentenceCard.style.display = 'block';
+        resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+    })();
+  </script>
+</body>
+</html>

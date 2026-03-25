@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flashcards — AI Study Assistant</title>
+  <meta name="description"
+    content="Interactive flip flashcards generated from your study material with smooth 3D animations." />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
+</head>
+
+<body>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">Creating flashcards…</p>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <nav class="navbar">
+    <a href="../index.html" class="nav-brand">
+      <div class="brand-icon">🧠</div>
+      <span class="brand-name">AI Study<span>Assist</span></span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="../index.html">🏠 Home</a></li>
+      <li><a href="summary.html">📝 Summarizer</a></li>
+      <li><a href="quiz.html">❓ Quiz</a></li>
+      <li><a href="flashcards.html" class="active">🃏 Flashcards</a></li>
+      <li><a href="planner.html">📅 Planner</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle"><span id="themeIcon">🌙</span><span
+          id="themeLabel">Dark</span></button>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <div class="page-badge">🃏 Flashcards</div>
+      <h1>Interactive Flashcards</h1>
+      <p>Flip cards to reveal answers. Use keyboard arrow keys or buttons to navigate.</p>
+    </div>
+
+    <!-- Input -->
+    <div class="content-card">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">📖</div>Study Material
+        </div>
+        <span class="word-count" id="wordCount">0 words</span>
+      </div>
+      <textarea class="text-input" id="textInput" placeholder="Paste study material to generate flashcards…"
+        rows="5"></textarea>
+      <div class="input-actions" style="margin-top:1rem">
+        <button class="btn btn-primary" id="generateBtn">🃏 Generate Flashcards</button>
+        <button class="btn btn-secondary" id="loadSavedBtn">📂 Load Saved</button>
+        <button class="btn btn-secondary" id="clearCardsBtn">🗑️ Clear Cards</button>
+      </div>
+    </div>
+
+    <!-- Flashcard Viewer -->
+    <div class="content-card" id="cardViewer" style="display:none">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">🃏</div><span id="viewerTitle">Flashcard Deck</span>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <span class="stat-chip" id="deckSize">0 cards</span>
+          <button class="btn btn-secondary btn-sm" id="shuffleBtn">🔀 Shuffle</button>
+        </div>
+      </div>
+
+      <!-- Card -->
+      <div class="flashcard-wrapper" id="cardWrapper" role="button" title="Click to flip" tabindex="0">
+        <div class="flashcard" id="flashcard">
+          <div class="flashcard-face">
+            <span class="flashcard-label">Question</span>
+            <div class="flashcard-content" id="cardFront">—</div>
+            <div class="flashcard-hint">👆 Click card to reveal answer</div>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <span class="flashcard-label">Answer</span>
+            <div class="flashcard-content" id="cardBack">—</div>
+            <div class="flashcard-hint">👆 Click to flip back</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="flashcard-nav">
+        <button class="btn btn-secondary" id="prevBtn">← Prev</button>
+        <span class="flashcard-counter" id="cardCounter">1 / 1</span>
+        <button class="btn btn-primary" id="nextBtn">Next →</button>
+      </div>
+
+      <!-- Dots -->
+      <div class="progress-dots" id="progressDots"></div>
+
+      <!-- Keyboard hint -->
+      <p style="text-align:center;font-size:0.78rem;color:var(--text-muted);margin-top:1rem">
+        ⌨️ Use ← → arrow keys to navigate &nbsp;·&nbsp; Space to flip
+      </p>
+    </div>
+
+    <!-- All Cards Grid -->
+    <div class="content-card" id="cardGrid" style="display:none">
+      <div class="content-card-header">
+        <div class="content-card-title">
+          <div class="title-icon">📋</div>All Flashcards
+        </div>
+        <button class="btn btn-success btn-sm" id="copyAllBtn">📋 Copy All</button>
+      </div>
+      <div id="allCardsContainer" style="display:flex;flex-direction:column;gap:.75rem"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="content-card" id="emptyState">
+      <div class="empty-state">
+        <div class="empty-icon">🃏</div>
+        <h3>No flashcards yet</h3>
+        <p>Paste your study material above and click <strong>Generate Flashcards</strong>.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>AI Study Assistant — <a href="../index.html">← Back to Home</a></p>
+  </footer>
+
+  <script src="../script.js"></script>
+  <script>
+    (function () {
+      let cards = [];
+      let current = 0;
+
+      const textInput = document.getElementById('textInput');
+      const generateBtn = document.getElementById('generateBtn');
+      const cardViewer = document.getElementById('cardViewer');
+      const cardGrid = document.getElementById('cardGrid');
+      const emptyState = document.getElementById('emptyState');
+      const flashcard = document.getElementById('flashcard');
+      const cardFront = document.getElementById('cardFront');
+      const cardBack = document.getElementById('cardBack');
+      const cardCounter = document.getElementById('cardCounter');
+      const progressDots = document.getElementById('progressDots');
+      const deckSize = document.getElementById('deckSize');
+      const allCards = document.getElementById('allCardsContainer');
+
+      /* Restore */
+      const savedInput = LS.get(LS_KEYS.INPUT);
+      if (savedInput) { textInput.value = savedInput; updateWordCount(savedInput); }
+
+      const savedCards = LS.get(LS_KEYS.FLASHCARDS);
+      if (savedCards && savedCards.length) { cards = savedCards; renderDeck(); }
+
+      textInput.addEventListener('input', () => {
+        updateWordCount(textInput.value);
+        LS.set(LS_KEYS.INPUT, textInput.value);
+      });
+
+      generateBtn.addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (!text) { showToast('⚠️ Enter or load some text first!', 'error'); return; }
+        showLoading('Creating flashcards…');
+        setTimeout(() => {
+          try {
+            cards = generateFlashcards(text);
+            if (!cards.length) {
+              showToast('⚠️ Could not create cards. Try more descriptive text.', 'error', 4000);
+              hideLoading(); return;
+            }
+            LS.set(LS_KEYS.FLASHCARDS, cards);
+            current = 0;
+            renderDeck();
+            showToast(`✅ ${cards.length} flashcards created!`, 'success');
+          } catch { showToast('❌ Error', 'error'); }
+          hideLoading();
+        }, 700);
+      });
+
+      document.getElementById('loadSavedBtn')?.addEventListener('click', () => {
+        const saved = LS.get(LS_KEYS.INPUT);
+        if (saved) { textInput.value = saved; updateWordCount(saved); showToast('📂 Loaded!', 'info'); }
+        else showToast('⚠️ No saved text found', 'error');
+      });
+
+      document.getElementById('clearCardsBtn')?.addEventListener('click', () => {
+        LS.remove(LS_KEYS.FLASHCARDS);
+        cards = []; current = 0;
+        cardViewer.style.display = 'none';
+        cardGrid.style.display = 'none';
+        emptyState.style.display = 'block';
+        showToast('🗑️ Cards cleared', 'info');
+      });
+
+      document.getElementById('shuffleBtn')?.addEventListener('click', () => {
+        cards = [...cards].sort(() => Math.random() - 0.5);
+        current = 0;
+        flashcard.classList.remove('flipped');
+        updateCardView();
+        showToast('🔀 Deck shuffled!', 'info');
+      });
+
+      /* Flip on click / space */
+      const wrapper = document.getElementById('cardWrapper');
+      wrapper.addEventListener('click', flipCard);
+      wrapper.addEventListener('keydown', e => {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipCard(); }
+      });
+
+      function flipCard() {
+        flashcard.classList.toggle('flipped');
+      }
+
+      /* Navigation */
+      document.getElementById('prevBtn')?.addEventListener('click', () => navigate(-1));
+      document.getElementById('nextBtn')?.addEventListener('click', () => navigate(1));
+
+      document.addEventListener('keydown', e => {
+        if (!cardViewer || cardViewer.style.display === 'none') return;
+        if (document.activeElement === textInput) return;
+        if (e.key === 'ArrowRight') navigate(1);
+        if (e.key === 'ArrowLeft') navigate(-1);
+        if (e.key === ' ') { e.preventDefault(); flipCard(); }
+      });
+
+      function navigate(dir) {
+        if (!cards.length) return;
+        current = (current + dir + cards.length) % cards.length;
+        flashcard.classList.remove('flipped');
+        setTimeout(updateCardView, 150);
+      }
+
+      function updateCardView() {
+        if (!cards.length) return;
+        const c = cards[current];
+        cardFront.textContent = c.front;
+        cardBack.textContent = c.back;
+        cardCounter.textContent = `${current + 1} / ${cards.length}`;
+        progressDots.querySelectorAll('.progress-dot').forEach((d, i) =>
+          d.classList.toggle('active', i === current)
+        );
+      }
+
+      function renderDeck() {
+        if (!cards.length) return;
+
+        /* Viewer */
+        updateCardView();
+        deckSize.textContent = `${cards.length} card${cards.length !== 1 ? 's' : ''}`;
+
+        /* Dots */
+        progressDots.innerHTML = cards.map((_, i) =>
+          `<div class="progress-dot ${i === 0 ? 'active' : ''}" onclick="gotoCard(${i})"></div>`
+        ).join('');
+
+        /* Grid */
+        allCards.innerHTML = cards.map((c, i) => `
+          <div class="quiz-item" style="cursor:default">
+            <div class="quiz-num">${i + 1}</div>
+            <div style="flex:1">
+              <div class="quiz-question">Q: ${escapeHtml(c.front)}</div>
+              <div class="quiz-answer" style="display:block;border-top:1px dashed var(--border);padding-top:.4rem;margin-top:.4rem">
+                💡 A: ${escapeHtml(c.back)}
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        cardViewer.style.display = 'block';
+        cardGrid.style.display = 'block';
+        emptyState.style.display = 'none';
+      }
+
+      document.getElementById('copyAllBtn')?.addEventListener('click', () => {
+        const saved = LS.get(LS_KEYS.FLASHCARDS);
+        if (!saved) return;
+        const text = saved.map((c, i) => `Card ${i + 1}:\nQ: ${c.front}\nA: ${c.back}`).join('\n\n');
+        copyToClipboard(text);
+      });
+
+      window.gotoCard = function (i) {
+        current = i;
+        flashcard.classList.remove('flipped');
+        setTimeout(updateCardView, 50);
+      };
+
+      function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+    })();
+  </script>
+</body>
+
+</html>

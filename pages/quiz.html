@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Generator — AI Study Assistant</title>
+  <meta name="description" content="Auto-generate 4-option MCQ quiz questions from study material using NLP-based rule extraction." />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❓</text></svg>" />
+
+  <style>
+    /* ── MCQ-specific styles ── */
+    .quiz-mcq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.5rem 1.75rem;
+      animation: cardFadeIn 0.4s ease-out both;
+      transition: var(--transition);
+    }
+
+    .quiz-mcq-item:hover { box-shadow: var(--shadow-md); }
+
+    .mcq-question-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .mcq-num {
+      min-width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .mcq-question-text {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* Options grid: 2 columns on wide, 1 on mobile */
+    .mcq-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-left: 2.75rem; /* align under question text */
+    }
+
+    @media (max-width: 600px) {
+      .mcq-options { grid-template-columns: 1fr; }
+    }
+
+    .mcq-option {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-primary);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+      text-align: left;
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mcq-option::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+      background: var(--accent-light);
+    }
+
+    .mcq-option:not(.answered):hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .mcq-option:not(.answered):hover::before { opacity: 1; }
+
+    /* Option label: A / B / C / D */
+    .option-label {
+      min-width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    /* ── Correct answer ── */
+    .mcq-option.correct {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.08);
+      color: #065f46;
+      cursor: not-allowed;
+      transform: none;
+      animation: correctPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    [data-theme="dark"] .mcq-option.correct { color: #6ee7b7; }
+
+    .mcq-option.correct .option-label {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .mcq-option.correct::after {
+      content: '✓';
+      position: absolute;
+      right: 1rem;
+      font-size: 1rem;
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    @keyframes correctPop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.03); }
+      70%  { transform: scale(0.98); }
+      100% { transform: scale(1); }
+    }
+
+    /* ── Wrong answer ── */
+    .mcq-option.wrong {
+      border-color: var(--danger);
+      background: rgba(239, 68, 68, 0.08);
+      color: #991b1b;
+      cursor: not-allowed;
+      transform: none;
+      animation: wrongShake 0.4s ease;
+    }
+
+    [data-theme="dark"] .mcq-option.wrong { color: #fca5a5; }
+
+    .mcq-option.wrong .option-label {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .mcq-option.wrong::after {
+      content: '✗';
+      position: absolute;
+      right: 1rem;
+      font-size: 1rem;
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    @keyframes wrongShake {
+      0%, 100% { transform: translateX(0); }
+      20%       { transform: translateX(-5px); }
+      40%       { transform: translateX(5px); }
+      60%       { transform: translateX(-4px); }
+      80%       { transform: translateX(4px); }
+    }
+
+    /* Dim remaining options after answering */
+    .mcq-option.dimmed {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Show correct answer if user picked wrong */
+    .mcq-option.reveal-correct {
+      border-color: var(--success);
+      background: rgba(16,185,129,0.05);
+      opacity: 1;
+    }
+
+    .mcq-option.reveal-correct .option-label {
+      background: var(--success);
+      color: #fff;
+    }
+
+    /* ── Score Bar ── */
+    .score-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .score-label { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); }
+
+    .score-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .score-progress {
+      flex: 1;
+      min-width: 120px;
+      height: 8px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      border-radius: 99px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    .quiz-question-list { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    /* stagger delay for mcq items */
+    .quiz-mcq-item:nth-child(1)  { animation-delay: 0.04s; }
+    .quiz-mcq-item:nth-child(2)  { animation-delay: 0.08s; }
+    .quiz-mcq-item:nth-child(3)  { animation-delay: 0.12s; }
+    .quiz-mcq-item:nth-child(4)  { animation-delay: 0.16s; }
+    .quiz-mcq-item:nth-child(5)  { animation-delay: 0.20s; }
+    .quiz-mcq-item:nth-child(6)  { animation-delay: 0.24s; }
+    .quiz-mcq-item:nth-child(7)  { animation-delay: 0.28s; }
+    .quiz-mcq-item:nth-child(8)  { animation-delay: 0.32s; }
+    .quiz-mcq-item:nth-child(9)  { animation-delay: 0.36s; }
+    .quiz-mcq-item:nth-child(10) { animation-delay: 0.40s; }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">Generating quiz…</p>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <nav class="navbar">
+    <a href="../index.html" class="nav-brand">
+      <div class="brand-icon">🧠</div>
+      <span class="brand-name">AI Study<span>Assist</span></span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="../index.html">🏠 Home</a></li>
+      <li><a href="summary.html">📝 Summarizer</a></li>
+      <li><a href="quiz.html" class="active">❓ Quiz</a></li>
+      <li><a href="flashcards.html">🃏 Flashcards</a></li>
+      <li><a href="planner.html">📅 Planner</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle"><span id="themeIcon">🌙</span><span id="themeLabel">Dark</span></button>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <div class="page-badge">❓ MCQ Quiz Generator</div>
+      <h1>Auto Quiz Generator</h1>
+      <p>Our rule-based engine creates <strong>4-option multiple choice questions</strong> from your text. Click an option to instantly see if you're right!</p>
+    </div>
+
+    <!-- Input Card -->
+    <div class="content-card">
+      <div class="content-card-header">
+        <div class="content-card-title"><div class="title-icon">📖</div>Study Material</div>
+        <span class="word-count" id="wordCount">0 words</span>
+      </div>
+      <textarea class="text-input" id="textInput" placeholder="Paste text to generate MCQ quiz questions…" rows="6"></textarea>
+      <div class="input-actions" style="margin-top:1rem">
+        <button class="btn btn-primary" id="generateBtn">⚡ Generate Quiz</button>
+        <button class="btn btn-secondary" id="loadSavedBtn">📂 Load Saved</button>
+        <button class="btn btn-secondary" id="clearQuizBtn">🗑️ Clear Quiz</button>
+        <button class="btn btn-success btn-sm" id="resetScoreBtn" style="display:none">🔄 Retake Quiz</button>
+      </div>
+    </div>
+
+    <!-- Live Score Banner (shown once quiz is generated) -->
+    <div class="score-banner" id="scoreBanner" style="display:none">
+      <div>
+        <div class="score-label">📊 Your Score</div>
+        <div class="score-value" id="scoreDisplay">0 / 0</div>
+      </div>
+      <div class="score-progress" style="max-width:200px">
+        <div class="score-fill" id="scoreFill"></div>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <span class="stat-chip" id="answeredCount">0 answered</span>
+        <span class="stat-chip" id="correctCount">0 correct</span>
+        <button class="btn btn-secondary btn-sm" id="copyQuizBtn">📋 Copy</button>
+      </div>
+    </div>
+
+    <!-- Quiz Questions List -->
+    <div id="quizCard" style="display:none">
+      <div class="quiz-question-list" id="quizList"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="content-card" id="emptyState">
+      <div class="empty-state">
+        <div class="empty-icon">❓</div>
+        <h3>No quiz yet</h3>
+        <p>Paste your study material above and click <strong>Generate Quiz</strong> to create MCQ questions, or load your previously saved input.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>AI Study Assistant — <a href="../index.html">← Back to Home</a></p>
+  </footer>
+
+  <script src="../script.js"></script>
+  <script>
+    (function () {
+      /* ── State ── */
+      let currentQuiz    = [];   // array of question objects with .options
+      let answered       = {};   // { questionIndex: true/false (correct?) }
+      const OPTION_LABELS = ['A', 'B', 'C', 'D'];
+
+      /* ── Elements ── */
+      const textInput    = document.getElementById('textInput');
+      const generateBtn  = document.getElementById('generateBtn');
+      const quizCard     = document.getElementById('quizCard');
+      const emptyState   = document.getElementById('emptyState');
+      const quizList     = document.getElementById('quizList');
+      const scoreBanner  = document.getElementById('scoreBanner');
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      const scoreFill    = document.getElementById('scoreFill');
+      const answeredCountEl = document.getElementById('answeredCount');
+      const correctCountEl  = document.getElementById('correctCount');
+      const resetScoreBtn   = document.getElementById('resetScoreBtn');
+
+      /* ── Restore saved state ── */
+      const savedInput = LS.get(LS_KEYS.INPUT);
+      if (savedInput) { textInput.value = savedInput; updateWordCount(savedInput); }
+
+      const savedQuiz = LS.get(LS_KEYS.QUIZ);
+      if (savedQuiz && savedQuiz.length && savedQuiz[0].options) {
+        currentQuiz = savedQuiz;
+        renderQuiz(currentQuiz);
+      }
+
+      /* ── Events ── */
+      textInput.addEventListener('input', () => {
+        updateWordCount(textInput.value);
+        LS.set(LS_KEYS.INPUT, textInput.value);
+      });
+
+      generateBtn.addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (!text) { showToast('⚠️ Enter or load some text first!', 'error'); return; }
+        showLoading('Generating MCQ questions…');
+        setTimeout(() => {
+          try {
+            const rawQuestions = generateQuiz(text);
+            if (!rawQuestions.length) {
+              showToast('⚠️ Could not extract questions. Try adding more descriptive text.', 'error', 4000);
+              hideLoading(); return;
+            }
+            // Attach 4-option MCQs
+            currentQuiz = generateMCQOptions(rawQuestions, text);
+            answered    = {};
+            LS.set(LS_KEYS.QUIZ, currentQuiz);
+            renderQuiz(currentQuiz);
+            showToast(`✅ ${currentQuiz.length} MCQ questions generated!`, 'success');
+          } catch(e) {
+            console.error(e);
+            showToast('❌ Error generating quiz', 'error');
+          }
+          hideLoading();
+        }, 700);
+      });
+
+      document.getElementById('loadSavedBtn')?.addEventListener('click', () => {
+        const saved = LS.get(LS_KEYS.INPUT);
+        if (saved) { textInput.value = saved; updateWordCount(saved); showToast('📂 Loaded!', 'info'); }
+        else showToast('⚠️ No saved text found. Go to Home first.', 'error');
+      });
+
+      document.getElementById('clearQuizBtn')?.addEventListener('click', () => {
+        LS.remove(LS_KEYS.QUIZ);
+        currentQuiz = []; answered = {};
+        quizCard.style.display   = 'none';
+        scoreBanner.style.display= 'none';
+        emptyState.style.display = 'block';
+        resetScoreBtn.style.display = 'none';
+        showToast('🗑️ Quiz cleared', 'info');
+      });
+
+      document.getElementById('copyQuizBtn')?.addEventListener('click', () => {
+        if (!currentQuiz.length) return;
+        const text = currentQuiz.map((q, i) => {
+          const opts = q.options.map((o, j) => `   ${OPTION_LABELS[j]}. ${o.text}`).join('\n');
+          const correct = q.options.find(o => o.isCorrect);
+          return `Q${i+1}: ${q.question}\n${opts}\n   ✓ Answer: ${correct ? correct.text : q.answer}`;
+        }).join('\n\n');
+        copyToClipboard(text);
+      });
+
+      resetScoreBtn.addEventListener('click', () => {
+        answered = {};
+        // Re-render (removes answered/correct/wrong classes)
+        renderQuiz(currentQuiz);
+        showToast('🔄 Quiz reset! Good luck!', 'info');
+      });
+
+      /* ── Render ── */
+      function renderQuiz(questions) {
+        if (!questions || !questions.length) return;
+
+        quizList.innerHTML = questions.map((q, qi) => {
+          const optionsHTML = (q.options || []).map((opt, oi) => `
+            <button
+              class="mcq-option"
+              data-qi="${qi}"
+              data-oi="${oi}"
+              data-correct="${opt.isCorrect}"
+              id="opt-${qi}-${oi}"
+            >
+              <span class="option-label">${OPTION_LABELS[oi]}</span>
+              <span class="option-text">${escapeHtml(opt.text)}</span>
+            </button>
+          `).join('');
+
+          return `
+            <div class="quiz-mcq-item" id="q-${qi}">
+              <div class="mcq-question-row">
+                <div class="mcq-num">${qi + 1}</div>
+                <div class="mcq-question-text">${escapeHtml(q.question)}</div>
+              </div>
+              <div class="mcq-options">
+                ${optionsHTML}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Attach click handlers
+        quizList.querySelectorAll('.mcq-option').forEach(btn => {
+          btn.addEventListener('click', handleOptionClick);
+        });
+
+        quizCard.style.display   = 'block';
+        emptyState.style.display = 'none';
+        scoreBanner.style.display= 'flex';
+        resetScoreBtn.style.display = 'inline-flex';
+        updateScoreDisplay();
+      }
+
+      /* ── Option Click Handler ── */
+      function handleOptionClick(e) {
+        const btn  = e.currentTarget;
+        const qi   = parseInt(btn.dataset.qi);
+        const oi   = parseInt(btn.dataset.oi);
+
+        // Already answered this question — ignore
+        if (answered[qi] !== undefined) return;
+
+        const isCorrect = btn.dataset.correct === 'true';
+        answered[qi]    = isCorrect;
+
+        // Style this button
+        btn.classList.add(isCorrect ? 'correct' : 'wrong');
+
+        // Lock all options in this question and reveal correct answer
+        const allOpts = quizList.querySelectorAll(`.mcq-option[data-qi="${qi}"]`);
+        allOpts.forEach(opt => {
+          if (opt === btn) return; // already styled
+          if (opt.dataset.correct === 'true') {
+            // Always reveal the correct one if user was wrong
+            if (!isCorrect) opt.classList.add('reveal-correct');
+            else            opt.classList.add('dimmed');
+          } else {
+            opt.classList.add('dimmed');
+          }
+          opt.classList.add('answered');
+        });
+        btn.classList.add('answered');
+
+        updateScoreDisplay();
+
+        // Check if all questions answered → show completion toast
+        if (Object.keys(answered).length === currentQuiz.length) {
+          const score = Object.values(answered).filter(Boolean).length;
+          const total = currentQuiz.length;
+          const pct   = Math.round((score / total) * 100);
+          const emoji = pct >= 80 ? '🎉' : pct >= 60 ? '👍' : '📖';
+          showToast(`${emoji} Quiz complete! You scored ${score}/${total} (${pct}%)`, 'success', 5000);
+        }
+      }
+
+      /* ── Score Display ── */
+      function updateScoreDisplay() {
+        const total      = currentQuiz.length;
+        const doneCount  = Object.keys(answered).length;
+        const correct    = Object.values(answered).filter(Boolean).length;
+        const pct        = total ? (correct / total) * 100 : 0;
+
+        scoreDisplay.textContent = `${correct} / ${total}`;
+        scoreFill.style.width    = `${pct}%`;
+
+        // Gradient colour shifts green as score improves
+        scoreFill.style.background =
+          pct >= 70
+            ? 'linear-gradient(90deg, var(--success), #34d399)'
+            : pct >= 40
+              ? 'linear-gradient(90deg, var(--warning), var(--success))'
+              : 'linear-gradient(90deg, var(--danger), var(--warning))';
+
+        answeredCountEl.textContent = `${doneCount} answered`;
+        correctCountEl.textContent  = `${correct} correct`;
+      }
+
+      /* ── Utility ── */
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+    })();
+  </script>
+</body>
+</html>

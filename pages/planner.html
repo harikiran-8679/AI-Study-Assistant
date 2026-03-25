@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Study Planner — AI Study Assistant</title>
+  <meta name="description" content="Smart study planner that distributes your topics evenly across available days." />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>" />
+
+  <style>
+    /* Extra planner-specific styles */
+    .planner-controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: start;
+      margin-bottom: 0;
+    }
+    .topics-field { grid-column: 1; }
+    .days-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: var(--accent-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      min-width: 200px;
+    }
+    .days-panel label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .days-input-wrapper { display: flex; align-items: center; gap: .5rem; }
+    .days-number {
+      width: 70px;
+      padding: .6rem .75rem;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-align: center;
+      transition: var(--transition);
+      outline: none;
+    }
+    .days-number:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .days-stepper { display: flex; flex-direction: column; gap: 3px; }
+    .day-step-btn {
+      width: 28px; height: 26px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem;
+      color: var(--text-secondary);
+      transition: var(--transition);
+      font-weight: 600;
+    }
+    .day-step-btn:hover { background: var(--accent); color: #fff; border-color: transparent; }
+
+    .plan-summary-card {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: var(--radius-lg);
+      padding: 1.5rem 2rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 30px var(--accent-glow);
+    }
+    .plan-stat { text-align: center; }
+    .plan-stat-num { font-size: 2rem; font-weight: 800; display: block; }
+    .plan-stat-label { font-size: 0.78rem; opacity: 0.85; text-transform: uppercase; letter-spacing: .06em; }
+
+    .review-day .day-header {
+      background: linear-gradient(135deg, #475569, #64748b);
+    }
+
+    @media(max-width:680px) {
+      .planner-controls { grid-template-columns: 1fr; }
+      .days-panel { flex-direction: row; flex-wrap: wrap; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">Building your study plan…</p>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <nav class="navbar">
+    <a href="../index.html" class="nav-brand">
+      <div class="brand-icon">🧠</div>
+      <span class="brand-name">AI Study<span>Assist</span></span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="../index.html">🏠 Home</a></li>
+      <li><a href="summary.html">📝 Summarizer</a></li>
+      <li><a href="quiz.html">❓ Quiz</a></li>
+      <li><a href="flashcards.html">🃏 Flashcards</a></li>
+      <li><a href="planner.html" class="active">📅 Planner</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle"><span id="themeIcon">🌙</span><span id="themeLabel">Dark</span></button>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <div class="page-badge">📅 Smart Planner</div>
+      <h1>Study Planner</h1>
+      <p>Enter your topics and available days — we'll build you a balanced, day-by-day study schedule.</p>
+    </div>
+
+    <!-- Input Card -->
+    <div class="content-card">
+      <div class="content-card-header">
+        <div class="content-card-title"><div class="title-icon">📋</div>Plan Your Study</div>
+      </div>
+
+      <div class="planner-controls">
+        <!-- Topics -->
+        <div class="topics-field form-group">
+          <label class="form-label">📚 Topics (one per line or comma-separated)</label>
+          <textarea
+            class="text-input"
+            id="topicsInput"
+            placeholder="e.g. Photosynthesis&#10;Cell Division&#10;DNA Replication&#10;Genetics&#10;Evolution"
+            rows="7"
+          ></textarea>
+        </div>
+
+        <!-- Days panel -->
+        <div class="days-panel">
+          <label>📅 Study Days</label>
+          <div class="days-input-wrapper">
+            <input type="number" class="days-number" id="daysInput" value="7" min="1" max="90" />
+            <div class="days-stepper">
+              <button class="day-step-btn" id="daysUp">▲</button>
+              <button class="day-step-btn" id="daysDown">▼</button>
+            </div>
+          </div>
+          <p style="font-size:.78rem;color:var(--accent);font-weight:600" id="topicsCountLabel">0 topics</p>
+          <button class="btn btn-primary" id="generatePlanBtn" style="width:100%">⚡ Generate Plan</button>
+          <button class="btn btn-secondary btn-sm" id="clearPlanBtn">🗑️ Clear Plan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan Summary Banner -->
+    <div id="planSummaryBanner" style="display:none" class="plan-summary-card">
+      <div class="plan-stat">
+        <span class="plan-stat-num" id="stat-topics">0</span>
+        <span class="plan-stat-label">Topics</span>
+      </div>
+      <div class="plan-stat">
+        <span class="plan-stat-num" id="stat-days">0</span>
+        <span class="plan-stat-label">Days</span>
+      </div>
+      <div class="plan-stat">
+        <span class="plan-stat-num" id="stat-perday">0</span>
+        <span class="plan-stat-label">Topics/Day</span>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)" id="copyPlanBtn">📋 Copy Plan</button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)" id="printPlanBtn">🖨️ Print</button>
+      </div>
+    </div>
+
+    <!-- Plan Grid -->
+    <div id="planGrid" style="display:none">
+      <div class="plan-grid" id="planContainer"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="content-card" id="emptyState">
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <h3>No plan yet</h3>
+        <p>Enter your topics on the left, set the number of study days, then click <strong>Generate Plan</strong>.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>AI Study Assistant — <a href="../index.html">← Back to Home</a></p>
+  </footer>
+
+  <script src="../script.js"></script>
+  <script>
+    (function () {
+      const topicsInput    = document.getElementById('topicsInput');
+      const daysInput      = document.getElementById('daysInput');
+      const generatePlanBtn= document.getElementById('generatePlanBtn');
+      const planContainer  = document.getElementById('planContainer');
+      const planGrid       = document.getElementById('planGrid');
+      const emptyState     = document.getElementById('emptyState');
+      const planBanner     = document.getElementById('planSummaryBanner');
+      const topicsCountLbl = document.getElementById('topicsCountLabel');
+
+      /* Restore */
+      const savedPlan = LS.get(LS_KEYS.PLANNER);
+      if (savedPlan && savedPlan.plan && savedPlan.plan.length) {
+        topicsInput.value = savedPlan.topics || '';
+        daysInput.value   = savedPlan.days   ||  7;
+        updateTopicsCount();
+        renderPlan(savedPlan.plan, savedPlan.topics, parseInt(savedPlan.days));
+      }
+
+      topicsInput.addEventListener('input', updateTopicsCount);
+
+      function updateTopicsCount() {
+        const topics = parseTopics(topicsInput.value);
+        topicsCountLbl.textContent = `${topics.length} topic${topics.length !== 1 ? 's' : ''}`;
+      }
+
+      function parseTopics(text) {
+        return text.split(/[\n,;]+/).map(t => t.trim()).filter(Boolean);
+      }
+
+      /* Stepper */
+      document.getElementById('daysUp')  .addEventListener('click', () => { daysInput.value = Math.min(90, +daysInput.value + 1); });
+      document.getElementById('daysDown').addEventListener('click', () => { daysInput.value = Math.max(1 , +daysInput.value - 1); });
+
+      generatePlanBtn.addEventListener('click', () => {
+        const topicsText = topicsInput.value.trim();
+        const days       = parseInt(daysInput.value);
+
+        if (!topicsText) { showToast('⚠️ Please enter at least one topic', 'error'); return; }
+        if (isNaN(days) || days < 1) { showToast('⚠️ Enter a valid number of days (1+)', 'error'); return; }
+
+        showLoading('Building your study plan…');
+        setTimeout(() => {
+          try {
+            const plan = generateStudyPlan(topicsText, days);
+            LS.set(LS_KEYS.PLANNER, { topics: topicsText, days, plan });
+            renderPlan(plan, topicsText, days);
+            showToast(`✅ ${days}-day plan created!`, 'success');
+          } catch { showToast('❌ Error creating plan', 'error'); }
+          hideLoading();
+        }, 600);
+      });
+
+      document.getElementById('clearPlanBtn')?.addEventListener('click', () => {
+        LS.remove(LS_KEYS.PLANNER);
+        planGrid.style.display   = 'none';
+        planBanner.style.display = 'none';
+        emptyState.style.display = 'block';
+        showToast('🗑️ Plan cleared', 'info');
+      });
+
+      document.getElementById('copyPlanBtn')?.addEventListener('click', () => {
+        const saved = LS.get(LS_KEYS.PLANNER);
+        if (!saved) return;
+        const text = saved.plan.map(d =>
+          `Day ${d.day}:\n${d.topics.map(t => `  • ${t}`).join('\n')}`
+        ).join('\n\n');
+        copyToClipboard(`Study Plan\n${'='.repeat(30)}\n\n${text}`);
+      });
+
+      document.getElementById('printPlanBtn')?.addEventListener('click', () => window.print());
+
+      function renderPlan(plan, topicsText, days) {
+        if (!plan || !plan.length) return;
+
+        const topics   = parseTopics(topicsText || '');
+        const perDay   = topics.length ? (topics.length / days).toFixed(1) : '—';
+
+        /* Stats */
+        document.getElementById('stat-topics').textContent = topics.length;
+        document.getElementById('stat-days'  ).textContent = days;
+        document.getElementById('stat-perday').textContent = perDay;
+        planBanner.style.display = 'flex';
+
+        /* Day cards */
+        planContainer.innerHTML = plan.map((d, idx) => `
+          <div class="day-card ${d.isReview ? 'review-day' : ''}" style="animation-delay:${idx * 0.04}s">
+            <div class="day-header">
+              <span class="day-title">📅 Day ${d.day}</span>
+              <span class="day-badge">${d.topics.length} topic${d.topics.length !== 1 ? 's' : ''}</span>
+            </div>
+            <ul class="day-topics">
+              ${d.topics.map(t => `
+                <li class="day-topic">
+                  <div class="topic-bullet"></div>
+                  ${escapeHtml(t)}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `).join('');
+
+        planGrid.style.display   = 'block';
+        emptyState.style.display = 'none';
+        planBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+    })();
+  </script>
+</body>
+</html>

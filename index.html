@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Study Assistant — Home</title>
+  <meta name="description" content="AI-powered study assistant with text summarization, quiz generation, flashcards, and study planner. Boost your learning with smart tools." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">Processing text…</p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <div class="brand-icon">🧠</div>
+      <span class="brand-name">AI Study<span>Assist</span></span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html" class="active">🏠 Home</a></li>
+      <li><a href="pages/summary.html">📝 Summarizer</a></li>
+      <li><a href="pages/quiz.html">❓ Quiz</a></li>
+      <li><a href="pages/flashcards.html">🃏 Flashcards</a></li>
+      <li><a href="pages/planner.html">📅 Planner</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark</span>
+      </button>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-blob hero-blob-1"></div>
+    <div class="hero-blob hero-blob-2"></div>
+    <div class="hero-blob hero-blob-3"></div>
+
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        AI-Powered Study Tools — No API needed
+      </div>
+      <h1>Study Smarter,<br/>Not Harder</h1>
+      <p>Paste your study material and let our AI instantly generate summaries, quizzes, flashcards, and personalized study plans — all in your browser.</p>
+
+      <!-- Main Input Card -->
+      <div class="input-section">
+        <div class="input-header">
+          <span class="input-label">📖 Paste your study material here</span>
+          <span class="word-count" id="wordCount">0 words · 0 characters</span>
+        </div>
+        <textarea
+          class="text-input"
+          id="mainTextInput"
+          placeholder="Paste your notes, textbook paragraphs, or any study material here…&#10;&#10;Example: 'Photosynthesis is the process by which green plants use sunlight to synthesize nutrients from carbon dioxide and water…'"
+          rows="8"
+        ></textarea>
+        <div class="input-actions">
+          <button class="btn btn-primary btn-lg" id="saveInputBtn">
+            💾 Save &amp; Continue
+          </button>
+          <button class="btn btn-secondary" id="clearBtn">
+            🗑️ Clear All
+          </button>
+          <button class="btn btn-secondary" id="copyBtn">
+            📋 Copy Text
+          </button>
+          <button class="btn btn-success" id="sampleBtn">
+            ✨ Load Sample
+          </button>
+        </div>
+      </div>
+
+      <!-- Feature Cards -->
+      <div class="features-grid" style="margin-top:2rem">
+        <a href="pages/summary.html" class="feature-card" style="--card-gradient: linear-gradient(135deg,#6366f1,#8b5cf6); animation-delay:0.1s">
+          <div class="card-icon">📝</div>
+          <h3>Text Summarizer</h3>
+          <p>AI extracts key sentences and highlights important keywords from your material.</p>
+          <span class="card-arrow">Summarize →</span>
+        </a>
+        <a href="pages/quiz.html" class="feature-card" style="--card-gradient: linear-gradient(135deg,#06b6d4,#3b82f6); animation-delay:0.2s">
+          <div class="card-icon">❓</div>
+          <h3>Quiz Generator</h3>
+          <p>Automatically creates smart questions with reveal-answer functionality.</p>
+          <span class="card-arrow">Generate Quiz →</span>
+        </a>
+        <a href="pages/flashcards.html" class="feature-card" style="--card-gradient: linear-gradient(135deg,#f59e0b,#ef4444); animation-delay:0.3s">
+          <div class="card-icon">🃏</div>
+          <h3>Flashcards</h3>
+          <p>Interactive flip cards with smooth 3D animation for effective memorization.</p>
+          <span class="card-arrow">Study Cards →</span>
+        </a>
+        <a href="pages/planner.html" class="feature-card" style="--card-gradient: linear-gradient(135deg,#10b981,#06b6d4); animation-delay:0.4s">
+          <div class="card-icon">📅</div>
+          <h3>Study Planner</h3>
+          <p>Distribute your topics across days with a smart, balanced study schedule.</p>
+          <span class="card-arrow">Make a Plan →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>AI Study Assistant &mdash; Built with ❤️ using HTML, CSS &amp; Vanilla JS &bull; Data stored locally in your browser</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
